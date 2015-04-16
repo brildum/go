@@ -899,6 +899,7 @@ func (pc *persistConn) readLoop() {
 		if hasBody {
 			waitForBodyRead = make(chan bool, 2)
 			resp.Body.(*bodyEOFSignal).earlyCloseFn = func() error {
+				pc.t.setReqCanceler(rc.req, nil)
 				// Sending false here sets alive to
 				// false and closes the connection
 				// below.
@@ -906,12 +907,15 @@ func (pc *persistConn) readLoop() {
 				return nil
 			}
 			resp.Body.(*bodyEOFSignal).fn = func(err error) {
+				pc.t.setReqCanceler(rc.req, nil)
 				waitForBodyRead <- alive &&
 					err == nil &&
 					!pc.sawEOF &&
 					pc.wroteRequest() &&
 					pc.t.putIdleConn(pc)
 			}
+		} else {
+			pc.t.setReqCanceler(rc.req, nil)
 		}
 
 		// The connection might be going away when we put the
@@ -939,8 +943,6 @@ func (pc *persistConn) readLoop() {
 				alive = false
 			}
 		}
-
-		pc.t.setReqCanceler(rc.req, nil)
 
 		if !alive {
 			pc.close()
